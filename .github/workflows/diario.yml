@@ -2,7 +2,7 @@ name: Curadoria Diaria Automatica
 
 on:
   schedule:
-    # Roda todos os dias às 06:00 da manhã (horário de Brasília)
+    # Executa todos os dias às 09:00 UTC (06:00 horário de Brasília)
     - cron: '0 9 * * *'
   workflow_dispatch:
 
@@ -10,11 +10,11 @@ jobs:
   executar-curadoria:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar código do repositório
+      - name: Descarregar código do repositório
         uses: actions/checkout@v4
 
       - name: Configurar Python
-        uses: setup-python@v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -28,7 +28,7 @@ jobs:
         run: |
           python gerador_diario.py
 
-      - name: Salvar atualizações no repositório
+      - name: Guardar atualizações no repositório
         run: |
           git config --global user.name "Robo Curador"
           git config --global user.email "bot@curadoria.local"
