@@ -1,0 +1,36 @@
+name: Curadoria Diaria Automatica
+
+on:
+  schedule:
+    # Roda todos os dias às 06:00 da manhã (horário de Brasília)
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  executar-curadoria:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          pip install -r requirements.txt
+
+      - name: Executar gerador de conteúdo
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          python gerador_diario.py
+
+      - name: Salvar atualizações no repositório
+        run: |
+          git config --global user.name "Robo Curador"
+          git config --global user.email "bot@curadoria.local"
+          git add curadoria.db
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Curadoria diária atualizada [skip ci]" && git push)
