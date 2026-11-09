@@ -2,7 +2,6 @@ name: Curadoria Diaria Automatica
 
 on:
   schedule:
-    # Executa todos os dias às 09:00 UTC (06:00 horário de Brasília)
     - cron: '0 9 * * *'
   workflow_dispatch:
 
@@ -25,6 +24,8 @@ jobs:
       - name: Executar gerador de conteúdo
         env:
           API_KEY: ${{ secrets.API_KEY }}
+          EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
+          EMAIL_SENHA: ${{ secrets.EMAIL_SENHA }}
         run: |
           python gerador_diario.py
 
