@@ -1,13 +1,18 @@
 import json
 import os
+import smtplib
 import sqlite3
 import time
 from datetime import date
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from google import genai
 from google.genai import types
 
 DB_NAME = "curadoria.db"
 API_KEY = os.environ.get("API_KEY")
+EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE")
+EMAIL_SENHA = os.environ.get("EMAIL_SENHA")
 
 
 def gerar_conteudo():
@@ -26,7 +31,7 @@ def gerar_conteudo():
 
     Responda ESTRITAMENTE em formato JSON com esta estrutura:
     {{
-      "carta_editor": "Texto completo da carta em markdown...",
+      "carta_editor": "Texto completo da carta em formato limpo...",
       "leituras": [
         {{
           "titulo": "Título da leitura",
@@ -41,7 +46,6 @@ def gerar_conteudo():
     }}
     """
 
-    # Lista de modelos para tentar caso algum esteja congestionado
     modelos = ["gemini-3.8-flash", "gemini-2.5-flash-lite"]
 
     for tentativa in range(5):
@@ -60,9 +64,7 @@ def gerar_conteudo():
             print(f"Erro temporário ({e}). Aguardando 30 segundos...")
             time.sleep(30)
 
-    raise RuntimeError(
-        "Não foi possível gerar a curadoria após 5 tentativas devido a instabilidade na API."
-    )
+    raise RuntimeError("Não foi possível gerar a curadoria após 5 tentativas.")
 
 
 def salvar_no_banco(dados):
@@ -128,7 +130,68 @@ def salvar_no_banco(dados):
         conn.commit()
 
 
+def enviar_email(dados):
+    if not EMAIL_REMETENTE or not EMAIL_SENHA:
+        print("Credenciais de e-mail não configuradas. Pulando envio.")
+        return
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"📖 Curadoria Executiva Diária — {date.today()}"
+    msg["From"] = EMAIL_REMETENTE
+    msg["To"] = EMAIL_REMETENTE
+
+    # Monta o corpo do e-mail em HTML limpo
+    html_leituras = ""
+    for i, item in enumerate(dados["leituras"], 1):
+        html_leituras += f"""
+        <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background-color: #ffffff;">
+            <span style="background-color: #eef2ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                {item['trilha']} • ⏱️ {item['tempo_min']} min
+            </span>
+            <h3 style="margin: 10px 0 4px 0; color: #111827;">{i}. {item['titulo']}</h3>
+            <p style="margin: 0 0 12px 0; font-size: 13px; color: #6b7280;">Fonte: {item['autor_fonte']}</p>
+            <p style="color: #374151; line-height: 1.5;">{item['resumo_executivo']}</p>
+            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 10px; margin: 12px 0; color: #166534;">
+                <strong>💡 Key Insight:</strong> {item['key_insight']}
+            </div>
+            <a href="{item['url']}" style="display: inline-block; background-color: #111827; color: #ffffff; text-decoration: none; padding: 8px 14px; border-radius: 5px; font-size: 13px;">
+                Acessar Fonte Original ↗
+            </a>
+        </div>
+        """
+
+    carta_formatada = dados["carta_editor"].replace("\n", "<br>")
+
+    html_completo = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px; color: #1f2937;">
+        <div style="max-width: 650px; margin: auto;">
+          <h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">
+            ✉️ Carta do Editor ({date.today()})
+          </h2>
+          <div style="background-color: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; line-height: 1.6; margin-bottom: 24px;">
+            {carta_formatada}
+          </div>
+          
+          <h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">
+            📖 Leituras Selecionadas
+          </h2>
+          {html_leituras}
+        </div>
+      </body>
+    </html>
+    """
+
+    msg.attach(MIMEText(html_completo, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+        server.sendmail(EMAIL_REMETENTE, EMAIL_REMETENTE, msg.as_string())
+    print("E-mail enviado com sucesso!")
+
+
 if __name__ == "__main__":
     conteudo = gerar_conteudo()
     salvar_no_banco(conteudo)
-    print("Curadoria do dia e Carta do Editor geradas com sucesso!")
+    enviar_email(conteudo)
+    print("Processo completo finalizado!")
