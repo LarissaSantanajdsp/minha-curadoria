@@ -1,6 +1,7 @@
-import os
 import json
+import os
 import sqlite3
+import time
 from datetime import date
 from google import genai
 from google.genai import types
@@ -8,9 +9,10 @@ from google.genai import types
 DB_NAME = "curadoria.db"
 API_KEY = os.environ.get("API_KEY")
 
+
 def gerar_conteudo():
     client = genai.Client(api_key=API_KEY)
-    
+
     prompt = f"""
     Atue como um Curador-Chefe de Inteligência Executiva em GEO (Generative Engine Optimization), IA, Liderança e Comunicação.
     Data de referência: {date.today()}.
@@ -38,35 +40,55 @@ def gerar_conteudo():
       ]
     }}
     """
-    
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        ),
+
+    # Lista de modelos para tentar caso algum esteja congestionado
+    modelos = ["gemini-3.8-flash", "gemini-2.5-flash-lite"]
+
+    for tentativa in range(5):
+        modelo_atual = modelos[tentativa % len(modelos)]
+        try:
+            print(f"Tentativa {tentativa + 1} usando o modelo {modelo_atual}...")
+            response = client.models.generate_content(
+                model=modelo_atual,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                ),
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Erro temporário ({e}). Aguardando 30 segundos...")
+            time.sleep(30)
+
+    raise RuntimeError(
+        "Não foi possível gerar a curadoria após 5 tentativas devido a instabilidade na API."
     )
-    
-    return json.loads(response.text)
+
 
 def salvar_no_banco(dados):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS carta_editor (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 data DATE NOT NULL UNIQUE,
                 conteudo TEXT NOT NULL
             )
-        """)
-        
-        cursor.execute("""
+        """
+        )
+
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO carta_editor (data, conteudo)
             VALUES (?, ?)
-        """, (str(date.today()), dados["carta_editor"]))
-        
-        cursor.execute("""
+        """,
+            (str(date.today()), dados["carta_editor"]),
+        )
+
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS leituras (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 titulo TEXT NOT NULL,
@@ -80,26 +102,31 @@ def salvar_no_banco(dados):
                 status TEXT DEFAULT 'Não lido',
                 notas_pessoais TEXT DEFAULT ''
             )
-        """)
-        
+        """
+        )
+
         for item in dados["leituras"]:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO leituras (
                     titulo, autor_fonte, trilha, tempo_min, url,
                     resumo_executivo, key_insight, data_inclusao, status, notas_pessoais
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Não lido', '')
-            """, (
-                item["titulo"],
-                item["autor_fonte"],
-                item["trilha"],
-                item["tempo_min"],
-                item["url"],
-                item["resumo_executivo"],
-                item["key_insight"],
-                str(date.today())
-            ))
-            
+            """,
+                (
+                    item["titulo"],
+                    item["autor_fonte"],
+                    item["trilha"],
+                    item["tempo_min"],
+                    item["url"],
+                    item["resumo_executivo"],
+                    item["key_insight"],
+                    str(date.today()),
+                ),
+            )
+
         conn.commit()
+
 
 if __name__ == "__main__":
     conteudo = gerar_conteudo()
