@@ -17,11 +17,10 @@ API_KEY = os.environ.get("API_KEY")
 EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE")
 EMAIL_SENHA = os.environ.get("EMAIL_SENHA")
 
-# Fontes reais com RSS oficial divididas por trilha
 FEEDS_POR_TRILHA = {
     "Acadêmica & Pesquisa (IA/LLMs)": [
-        "https://export.arxiv.org/rss/cs.IR",  # Information Retrieval (Busca e GEO)
-        "https://export.arxiv.org/rss/cs.CL",  # Computation and Language (LLMs)
+        "https://export.arxiv.org/rss/cs.IR",
+        "https://export.arxiv.org/rss/cs.CL",
     ],
     "Aplicação de Mercado (GEO & Search)": [
         "https://searchengineland.com/feed",
@@ -48,7 +47,6 @@ def coletar_artigos_reais():
                     link_real = entry.get("link", "").strip()
                     titulo_real = entry.get("title", "").strip()
                     resumo_bruto = entry.get("summary", entry.get("description", ""))
-                    # Remove tags HTML do resumo bruto
                     resumo_limpo = re.sub(r"<[^<]+?>", "", resumo_bruto)[:1200]
 
                     if link_real.startswith("http") and titulo_real:
@@ -63,7 +61,6 @@ def coletar_artigos_reais():
                 print(f"Aviso ao ler feed {feed_url}: {e}")
 
         if candidatos_trilha:
-            # Escolhe 1 artigo real recente desta trilha
             escolhido = random.choice(candidatos_trilha[:5])
             artigos_coletados.append(escolhido)
 
@@ -122,7 +119,7 @@ def gerar_curadoria_com_ia(artigos_reais):
     }}
     """
 
-   modelos = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
+    modelos = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
     for tentativa in range(5):
         modelo_atual = modelos[tentativa % len(modelos)]
@@ -138,7 +135,6 @@ def gerar_curadoria_com_ia(artigos_reais):
             )
             resultado_ia = extrair_json(response.text)
 
-            # Monta o resultado final mantendo as URLs 100% originais coletadas pelo Python
             leituras_finais = []
             for item_ia in resultado_ia["itens"]:
                 idx = item_ia["indice"]
@@ -148,7 +144,7 @@ def gerar_curadoria_com_ia(artigos_reais):
                     "autor_fonte": artigo_original["fonte"],
                     "trilha": artigo_original["trilha"],
                     "tempo_min": item_ia.get("tempo_min", 8),
-                    "url": artigo_original["url_real"],  # URL real intocada pela IA
+                    "url": artigo_original["url_real"],
                     "resumo_executivo": item_ia["resumo_executivo"],
                     "key_insight": item_ia["key_insight"],
                 })
@@ -236,51 +232,4 @@ def enviar_email(dados):
             <span style="background-color: #eef2ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
                 {item['trilha']} • ⏱️ {item['tempo_min']} min
             </span>
-            <h3 style="margin: 10px 0 4px 0; color: #111827;">{i}. {item['titulo']}</h3>
-            <p style="margin: 0 0 12px 0; font-size: 13px; color: #6b7280;">Fonte: {item['autor_fonte']}</p>
-            <p style="color: #374151; line-height: 1.5;">{item['resumo_executivo']}</p>
-            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 10px; margin: 12px 0; color: #166534;">
-                <strong>💡 Key Insight:</strong> {item['key_insight']}
-            </div>
-            <a href="{item['url']}" style="display: inline-block; background-color: #111827; color: #ffffff; text-decoration: none; padding: 8px 14px; border-radius: 5px; font-size: 13px;">
-                Acessar Fonte Original ↗
-            </a>
-        </div>
-        """
-
-    carta_formatada = dados["carta_editor"].replace("\n", "<br>")
-
-    html_completo = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px; color: #1f2937;">
-        <div style="max-width: 650px; margin: auto;">
-          <h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">
-            ✉️ Carta do Editor ({date.today()})
-          </h2>
-          <div style="background-color: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; line-height: 1.6; margin-bottom: 24px;">
-            {carta_formatada}
-          </div>
-          
-          <h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">
-            📖 Leituras Selecionadas
-          </h2>
-          {html_leituras}
-        </div>
-      </body>
-    </html>
-    """
-
-    msg.attach(MIMEText(html_completo, "html"))
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(EMAIL_REMETENTE, EMAIL_SENHA)
-        server.sendmail(EMAIL_REMETENTE, EMAIL_REMETENTE, msg.as_string())
-    print("E-mail enviado com sucesso!")
-
-
-if __name__ == "__main__":
-    artigos_reais = coletar_artigos_reais()
-    conteudo = gerar_curadoria_com_ia(artigos_reais)
-    salvar_no_banco(conteudo)
-    enviar_email(conteudo)
-    print("Processo completo finalizado com fontes reais!")
+            <h3 style="margin
