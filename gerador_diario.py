@@ -226,4 +226,18 @@ def enviar_email(dados):
 
     msg.attach(MIMEText(html_completo, "html"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com",
+    server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+    server.sendmail(EMAIL_REMETENTE, EMAIL_REMETENTE, msg.as_string())
+    server.quit()
+    print("E-mail enviado com sucesso!")
+
+
+if __name__ == "__main__":
+    artigos_reais = coletar_artigos_reais()
+    conteudo = gerar_curadoria_com_ia(artigos_reais)
+    salvar_no_banco(conteudo)
+    enviar_email(conteudo)
+    print("Processo completo finalizado com fontes reais!")
+
+# FIM DO ARQUIVO
