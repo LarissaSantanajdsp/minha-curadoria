@@ -92,12 +92,18 @@ def gerar_curadoria_com_ia(artigos_reais):
         ']}'
     )
 
-    modelos = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
+    modelos = [
+        "gemini-2.5-flash",
+        "gemini-3.8-pro",
+        "gemini-2.5-pro",
+        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+    ]
 
-    for tentativa in range(5):
-        modelo_atual = modelos[tentativa % len(modelos)]
+    for tentativa in range(len(modelos)):
+        modelo_atual = modelos[tentativa]
         try:
-            print(f"Tentativa {tentativa + 1} processando artigos reais com {modelo_atual}...")
+            print(f"Tentativa {tentativa + 1} usando o modelo {modelo_atual}...")
             response = client.models.generate_content(
                 model=modelo_atual,
                 contents=prompt,
@@ -127,10 +133,27 @@ def gerar_curadoria_com_ia(artigos_reais):
                 "leituras": leituras_finais,
             }
         except Exception as e:
-            print(f"Erro temporário ({e}). Aguardando 30 segundos...")
-            time.sleep(30)
+            print(f"Modelo {modelo_atual} indisponível ({e}). Tentando próximo servidor em 10s...")
+            time.sleep(10)
 
-    raise RuntimeError("Não foi possível gerar a curadoria após 5 tentativas.")
+    # Plano C: Se todos os servidores de IA estiverem congestionados, entrega os artigos reais diretamente
+    print("Servidores de IA congestionados. Gerando edição direta a partir dos feeds oficiais...")
+    leituras_diretas = []
+    for art in artigos_reais:
+        leituras_diretas.append({
+            "titulo": art["titulo_original"],
+            "autor_fonte": art["fonte"],
+            "trilha": art["trilha"],
+            "tempo_min": 8,
+            "url": art["url_real"],
+            "resumo_executivo": art["texto_base"] or "Acesse o artigo original no botão abaixo para leitura completa.",
+            "key_insight": "Artigo selecionado diretamente do feed oficial da fonte.",
+        })
+
+    return {
+        "carta_editor": f"Seleção diária de {date.today()} extraída diretamente das fontes oficiais (arXiv, Search Engine Land, MIT Sloan e HBR).",
+        "leituras": leituras_diretas,
+    }
 
 
 def salvar_no_banco(dados):
