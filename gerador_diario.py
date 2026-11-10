@@ -122,7 +122,7 @@ def gerar_curadoria_com_ia(artigos_reais):
     }}
     """
 
-    modelos = ["gemini-3.8-flash", "gemini-2.5-flash-lite"]
+   modelos = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
     for tentativa in range(5):
         modelo_atual = modelos[tentativa % len(modelos)]
