@@ -78,46 +78,19 @@ def extrair_json(texto):
 def gerar_curadoria_com_ia(artigos_reais):
     client = genai.Client(api_key=API_KEY)
 
-    prompt = f"""
-    Atue como um Curador-Chefe de Inteligência Executiva.
-    Data de referência: {date.today()}.
-
-    Abaixo estão 3 artigos REAIS coletados hoje de fontes oficiais.
-    Sua tarefa é:
-    1. Redigir uma "Carta do Editor" em português do Brasil conectando os temas desses 3 artigos e explicando por que importam hoje.
-    2. Para cada um dos 3 artigos, escrever um resumo executivo claro em português do Brasil (2 parágrafos) e extrair um "Key Insight" prático e contra-intuitivo baseado EXCLUSIVAMENTE no texto fornecido.
-
-    ARTIGOS REAIS COLETADOS:
-    {json.dumps(artigos_reais, ensure_ascii=False, indent=2)}
-
-    Responda EXCLUSIVAMENTE com um JSON válido nesta estrutura:
-    {{
-      "carta_editor": "Texto completo da carta em português do Brasil...",
-      "itens": [
-        {{
-          "indice": 0,
-          "titulo_pt": "Tradução fiel do título para português (ou título original se for nome próprio)",
-          "tempo_min": 8,
-          "resumo_executivo": "Resumo executivo em português...",
-          "key_insight": "Insight prático extraído do texto..."
-        }},
-        {{
-          "indice": 1,
-          "titulo_pt": "...",
-          "tempo_min": 10,
-          "resumo_executivo": "...",
-          "key_insight": "..."
-        }},
-        {{
-          "indice": 2,
-          "titulo_pt": "...",
-          "tempo_min": 7,
-          "resumo_executivo": "...",
-          "key_insight": "..."
-        }}
-      ]
-    }}
-    """
+    prompt = (
+        f"Atue como um Curador-Chefe de Inteligência Executiva. Data: {date.today()}.\n"
+        "Abaixo estão 3 artigos REAIS coletados hoje de fontes oficiais.\n"
+        "1. Redija uma 'Carta do Editor' em português do Brasil conectando os temas desses 3 artigos.\n"
+        "2. Para cada artigo, escreva um resumo executivo em português do Brasil (2 parágrafos) e um 'Key Insight' prático baseado EXCLUSIVAMENTE no texto.\n\n"
+        f"ARTIGOS REAIS:\n{json.dumps(artigos_reais, ensure_ascii=False)}\n\n"
+        'Responda EXCLUSIVAMENTE com um JSON válido nesta estrutura:\n'
+        '{"carta_editor": "Texto da carta...", "itens": ['
+        '{"indice": 0, "titulo_pt": "Título em PT", "tempo_min": 8, "resumo_executivo": "Resumo...", "key_insight": "Insight..."},'
+        '{"indice": 1, "titulo_pt": "Título em PT", "tempo_min": 10, "resumo_executivo": "Resumo...", "key_insight": "Insight..."},'
+        '{"indice": 2, "titulo_pt": "Título em PT", "tempo_min": 7, "resumo_executivo": "Resumo...", "key_insight": "Insight..."}'
+        ']}'
+    )
 
     modelos = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
@@ -164,53 +137,52 @@ def salvar_no_banco(dados):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS carta_editor (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data DATE NOT NULL UNIQUE,
-                conteudo TEXT NOT NULL
-            )
-        """)
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS carta_editor ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "data DATE NOT NULL UNIQUE, "
+            "conteudo TEXT NOT NULL)"
+        )
 
-        cursor.execute("""
-            INSERT OR REPLACE INTO carta_editor (data, conteudo)
-            VALUES (?, ?)
-        """, (str(date.today()), dados["carta_editor"]))
+        cursor.execute(
+            "INSERT OR REPLACE INTO carta_editor (data, conteudo) VALUES (?, ?)",
+            (str(date.today()), dados["carta_editor"]),
+        )
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS leituras (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                titulo TEXT NOT NULL,
-                autor_fonte TEXT NOT NULL,
-                trilha TEXT NOT NULL,
-                tempo_min INTEGER NOT NULL,
-                url TEXT NOT NULL,
-                resumo_executivo TEXT NOT NULL,
-                key_insight TEXT NOT NULL,
-                data_inclusao DATE NOT NULL,
-                status TEXT DEFAULT 'Não lido',
-                notas_pessoais TEXT DEFAULT ''
-            )
-        """)
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS leituras ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "titulo TEXT NOT NULL, "
+            "autor_fonte TEXT NOT NULL, "
+            "trilha TEXT NOT NULL, "
+            "tempo_min INTEGER NOT NULL, "
+            "url TEXT NOT NULL, "
+            "resumo_executivo TEXT NOT NULL, "
+            "key_insight TEXT NOT NULL, "
+            "data_inclusao DATE NOT NULL, "
+            "status TEXT DEFAULT 'Não lido', "
+            "notas_pessoais TEXT DEFAULT '')"
+        )
 
         cursor.execute("DELETE FROM leituras WHERE data_inclusao = ?", (str(date.today()),))
 
         for item in dados["leituras"]:
-            cursor.execute("""
-                INSERT INTO leituras (
-                    titulo, autor_fonte, trilha, tempo_min, url,
-                    resumo_executivo, key_insight, data_inclusao, status, notas_pessoais
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Não lido', '')
-            """, (
-                item["titulo"],
-                item["autor_fonte"],
-                item["trilha"],
-                item["tempo_min"],
-                item["url"],
-                item["resumo_executivo"],
-                item["key_insight"],
-                str(date.today()),
-            ))
+            cursor.execute(
+                "INSERT INTO leituras ("
+                "titulo, autor_fonte, trilha, tempo_min, url, "
+                "resumo_executivo, key_insight, data_inclusao, status, notas_pessoais"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Não lido', '')",
+                (
+                    item["titulo"],
+                    item["autor_fonte"],
+                    item["trilha"],
+                    item["tempo_min"],
+                    item["url"],
+                    item["resumo_executivo"],
+                    item["key_insight"],
+                    str(date.today()),
+                ),
+            )
 
         conn.commit()
 
@@ -221,15 +193,37 @@ def enviar_email(dados):
         return
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"📖 Curadoria Executiva Diária — {date.today()}"
+    msg["Subject"] = f"Curadoria Executiva Diária - {date.today()}"
     msg["From"] = EMAIL_REMETENTE
     msg["To"] = EMAIL_REMETENTE
 
     html_leituras = ""
     for i, item in enumerate(dados["leituras"], 1):
-        html_leituras += f"""
-        <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background-color: #ffffff;">
-            <span style="background-color: #eef2ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                {item['trilha']} • ⏱️ {item['tempo_min']} min
-            </span>
-            <h3 style="margin
+        html_leituras += (
+            '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background-color: #ffffff;">'
+            f'<span style="background-color: #eef2ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">'
+            f"{item['trilha']} - {item['tempo_min']} min</span>"
+            f'<h3 style="margin: 10px 0 4px 0; color: #111827;">{i}. {item["titulo"]}</h3>'
+            f'<p style="margin: 0 0 12px 0; font-size: 13px; color: #6b7280;">Fonte: {item["autor_fonte"]}</p>'
+            f'<p style="color: #374151; line-height: 1.5;">{item["resumo_executivo"]}</p>'
+            f'<div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 10px; margin: 12px 0; color: #166534;">'
+            f'<strong>Key Insight:</strong> {item["key_insight"]}</div>'
+            f'<a href="{item["url"]}" style="display: inline-block; background-color: #111827; color: #ffffff; text-decoration: none; padding: 8px 14px; border-radius: 5px; font-size: 13px;">'
+            'Acessar Fonte Original</a></div>'
+        )
+
+    carta_formatada = dados["carta_editor"].replace("\n", "<br>")
+
+    html_completo = (
+        '<html><body style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px; color: #1f2937;">'
+        '<div style="max-width: 650px; margin: auto;">'
+        f'<h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">Carta do Editor ({date.today()})</h2>'
+        f'<div style="background-color: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; line-height: 1.6; margin-bottom: 24px;">{carta_formatada}</div>'
+        '<h2 style="color: #111827; border-bottom: 2px solid #111827; padding-bottom: 8px;">Leituras Selecionadas</h2>'
+        f'{html_leituras}'
+        '</div></body></html>'
+    )
+
+    msg.attach(MIMEText(html_completo, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com",
